@@ -142,9 +142,77 @@ for (i in 1:7){
 print(bias)
 
 ## make nice table
-bias_table_nice <- rbind("Imp included"=paste0(formatC(bias["Imp included", ], digits = 4, format = "f"), " (", formatC(bias["Imp included SD", ], digits = 4, format = "f"), ")"),
-                         "Imp not included"=paste0(formatC(bias["Imp not included", ], digits = 4, format = "f"), " (", formatC(bias["Imp not included SD", ], digits = 4, format = "f"), ")"),
-                         "CC included"=paste0(formatC(bias["CC included", ], digits = 4, format = "f"), " (", formatC(bias["CC included SD", ], digits = 4, format = "f"), ")"),
-                         "CC not included"=paste0(formatC(bias["CC not included", ], digits = 4, format = "f"), " (", formatC(bias["CC not included SD", ], digits = 4, format = "f"), ")"))
+bias_table_nice <- rbind("CC included"=paste0(formatC(bias["CC included", ], digits = 4, format = "f"), " (", formatC(bias["CC included SD", ], digits = 4, format = "f"), ")"),
+                         "Imp included"=paste0(formatC(bias["Imp included", ], digits = 4, format = "f"), " (", formatC(bias["Imp included SD", ], digits = 4, format = "f"), ")"),
+                         "CC not included"=paste0(formatC(bias["CC not included", ], digits = 4, format = "f"), " (", formatC(bias["CC not included SD", ], digits = 4, format = "f"), ")"),
+                         "Imp not included"=paste0(formatC(bias["Imp not included", ], digits = 4, format = "f"), " (", formatC(bias["Imp not included SD", ], digits = 4, format = "f"), ")"))
 write.csv(bias_table_nice, "bias_table_nice.csv")                         
+
+### Individual examples of beta, plotted
+vars_toplot <- c(2, 7) # weak evidence, strong evidence
+howmany <- 15 # how many simulations
+
+sims_toplot <- sample(1:N_sims, howmany) # randomly choose which simulations to plot
+
+col_ind <- c("Incl"="black", "Excl"="steelblue")
+
+png(filename="Simulation_betaplots_examples.png", width=120, height=90, units="mm", res=500)
+par(mar=c(3.5, 2.5, 1, 1), cex=0.6, tcl=-0.25) #
+for (i in 1:length(vars_toplot)){
+  
+  v <- vars_toplot[i]
+  
+  x_vals <- seq(from=i-0.2, to=i+0.2, length.out=howmany)
+  
+  SEbars <- cbind(CCCoef[sims_toplot, v]-1.96*CCCoefSE[sims_toplot, v], CCCoef[sims_toplot, v]+1.96*CCCoefSE[sims_toplot, v])
+  ylimits <- 1.1*c(min(SEbars), max(SEbars))
+  
+  Excl_Incl <- sapply(1:howmany, function(e) if (SEbars[e, 1]<=0){"Excl"} else{"Incl"}) #if includes the null value these are excluded from the imputation model
+  #Excl_Incl <- c("Excl", "Incl")[ImpInd[sims_toplot, v]+1]
+    
+  # mean beta and mean SE for the sims
+  meanCC_beta <- c(mean(CCCoef[sims_toplot[Excl_Incl=="Excl"], v]), mean(CCCoef[sims_toplot[Excl_Incl=="Incl"], v]))
+  meanCC_SE <- c(mean(CCCoefSE[sims_toplot[Excl_Incl=="Excl"], v]), mean(CCCoefSE[sims_toplot[Excl_Incl=="Incl"], v]))
+  
+  meanMI_beta<- c(mean(ImpCoef[sims_toplot[Excl_Incl=="Excl"], v]), mean(ImpCoef[sims_toplot[Excl_Incl=="Incl"], v]))
+  meanMI_SE <- c(mean(ImpCoefSE[sims_toplot[Excl_Incl=="Excl"], v]), mean(ImpCoefSE[sims_toplot[Excl_Incl=="Incl"], v]))
+  
+  if (i==1){
+    plot(x_vals, CCCoef[sims_toplot, v], pch=16, col=col_ind[Excl_Incl],
+         xlim=c(0.5, length(vars_toplot)+0.5), ylim=ylimits, axes=FALSE, xlab="", ylab="") 
+    arrows(x_vals, SEbars[, 1], 
+           x_vals, SEbars[, 2],  col=col_ind[Excl_Incl], length=0.02, angle=90, code=3)
+    abline(h=0, lty=2)
+    abline(h=0.2, lty=1)
+    mtext(side=2, "Beta", line=1.5, cex=0.8); axis(2, las=2, hadj=0.5, cex.axis=0.9)
+    #axis(1, at=1:length(vars_toplot), labels=paste0("x", vars_toplot), cex.axis=0.9, padj=-1.8); 
+    axis(1, at=1:length(vars_toplot), labels=c("x2\nCovariate with\nweak evidence", "x7\nCovariate with\nstrong evidence"), cex.axis=0.9, padj=0.5); 
+    box()
+    text(0.55, 0.05, expression(paste(beta, "=0")))
+    text(0.55, 0.25, expression(paste(" True ", beta)))
+  } else{
+    points(x_vals, CCCoef[sims_toplot, v], pch=16, col=col_ind[Excl_Incl]) 
+    arrows(x_vals, SEbars[, 1], 
+           x_vals, SEbars[, 2],  col=col_ind[Excl_Incl], length=0.02, angle=90, code=3)
+  }
+  ## add a diamond to show the pooled estimate
+  # Incl (CC)
+  poly_x <- i+0.3
+  polygon(x=c(poly_x-0.025, poly_x, poly_x+0.025, poly_x-0.025, poly_x, poly_x+0.025), 
+          y=c(meanCC_beta[2], meanCC_beta[2]+meanCC_SE[2], meanCC_beta[2], meanCC_beta[2], meanCC_beta[2]-meanCC_SE[2], meanCC_beta[2]),
+          col=NA, border=col_ind["Incl"])
+  # Excl (CC)
+  poly_x <- i+0.35
+  polygon(x=c(poly_x-0.025, poly_x, poly_x+0.025, poly_x-0.025, poly_x, poly_x+0.025), 
+          y=c(meanCC_beta[1], meanCC_beta[1]+meanCC_SE[1], meanCC_beta[1], meanCC_beta[1], meanCC_beta[1]-meanCC_SE[1], meanCC_beta[1]),
+          col=NA, border=col_ind["Excl"])
+  # Excl (MI)
+  poly_x <- i+0.4
+  polygon(x=c(poly_x-0.025, poly_x, poly_x+0.025, poly_x-0.025, poly_x, poly_x+0.025), 
+          y=c(meanMI_beta[1], meanMI_beta[1]+meanMI_SE[1], meanMI_beta[1], meanMI_beta[1], meanMI_beta[1]-meanMI_SE[1], meanMI_beta[1]),
+          col=NA, border="red")
+}
+dev.off()
+
+
 
